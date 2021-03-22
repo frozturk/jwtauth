@@ -22,10 +22,14 @@ type TokenDetails struct {
 
 var JWTSECRET string
 var redisClient *redis.Client
+var atExpiryTime time.Duration
+var rtExpiryTime time.Duration
 
-func Setup(jwtsecret string, redisclient *redis.Client) {
+func Setup(jwtsecret string, redisclient *redis.Client, atExpiry time.Duration, rtExpiry time.Duration) {
 	JWTSECRET = jwtsecret
 	redisClient = redisclient
+	atExpiryTime = atExpiry
+	rtExpiryTime = rtExpiry
 }
 
 func CreateToken(userid uint64) (*TokenDetails, error) {
@@ -59,7 +63,7 @@ func LogoutToken(r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	blacklistTime := time.Unix(accessTokenClaims.ExpiresAt, 0).Add(time.Hour * 24 * 7).Unix()
+	blacklistTime := time.Unix(accessTokenClaims.ExpiresAt, 0).Add(rtExpiryTime).Unix()
 	err = blacklistToken(accessTokenClaims.Id, accessTokenClaims.Subject, blacklistTime)
 	return err
 }
@@ -136,9 +140,9 @@ func generateTokenHMAC(token_uuid string, user_id string, isAccessToken bool) (s
 	claims.Id = token_uuid
 	claims.Subject = user_id
 	if isAccessToken {
-		claims.ExpiresAt = time.Now().Add(time.Minute * 15).Unix()
+		claims.ExpiresAt = time.Now().Add(atExpiryTime).Unix()
 	} else {
-		claims.ExpiresAt = time.Now().Add(time.Hour * 24 * 7).Unix()
+		claims.ExpiresAt = time.Now().Add(rtExpiryTime).Unix()
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
